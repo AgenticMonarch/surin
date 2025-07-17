@@ -46,6 +46,14 @@ class CLI:
             default=None
         )
         
+        # Scan mode options
+        parser.add_argument(
+            '--scan-mode',
+            choices=['fast', 'deep'],
+            default='fast',
+            help='Scan mode: fast (subdomain names only) or deep (with IP resolution and additional checks) (default: fast)'
+        )
+        
         # Output options
         parser.add_argument(
             '--output',
@@ -57,6 +65,12 @@ class CLI:
         parser.add_argument(
             '--output-file',
             help='Write output to file instead of stdout'
+        )
+        
+        parser.add_argument(
+            '--show-ip',
+            action='store_true',
+            help='Show IP addresses in fast scan mode (default: False)'
         )
         
         # Concurrency options
@@ -146,16 +160,19 @@ class CLI:
         return True
 
     def display_results(self, result: Result, output_format: str, 
-                       output_file: Optional[str] = None) -> None:
+                       output_file: Optional[str] = None, scan_mode: str = 'fast',
+                       show_ip: bool = False) -> None:
         """Display results in the specified format.
         
         Args:
             result: Discovery results
             output_format: Output format (text, json, csv)
             output_file: Optional output file path
+            scan_mode: Scan mode ('fast' or 'deep')
+            show_ip: Whether to show IP addresses in fast scan mode
         """
         from surin.utils.formatters import write_output
-        write_output(result, output_format, output_file)
+        write_output(result, output_format, output_file, scan_mode=scan_mode, show_ip=show_ip)
 
     def display_summary(self, result: Result) -> None:
         """Display summary of results.
@@ -199,7 +216,9 @@ def main():
                 methods=args.methods,
                 concurrency=args.concurrency,
                 error_handler=error_handler,
-                enrich=True,
+                enrich=args.scan_mode == 'deep',
+                show_ip=args.show_ip,
+                scan_mode=args.scan_mode,
                 verbose=args.verbose
             )
             
@@ -215,7 +234,8 @@ def main():
             result = manager.discover()
             
             # Display results
-            cli.display_results(result, args.output, args.output_file)
+            cli.display_results(result, args.output, args.output_file, 
+                              scan_mode=args.scan_mode, show_ip=args.show_ip)
             
             # Display summary if not quiet
             if not args.quiet:

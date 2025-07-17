@@ -27,7 +27,7 @@ class DiscoveryManager:
 
     def __init__(self, domain: str, methods: List[str] = None, concurrency: int = 10, 
                  error_handler: Optional[ErrorHandler] = None, enrich: bool = True,
-                 verbose: bool = False):
+                 verbose: bool = False, scan_mode: str = 'fast', show_ip: bool = False):
         """Initialize the discovery manager.
         
         Args:
@@ -37,6 +37,8 @@ class DiscoveryManager:
             error_handler: Error handler instance
             enrich: Whether to enrich results with additional information
             verbose: Enable verbose output
+            scan_mode: Scan mode ('fast' or 'deep')
+            show_ip: Whether to show IP addresses in fast scan mode
         """
         self.domain = domain
         self.methods = methods
@@ -44,6 +46,8 @@ class DiscoveryManager:
         self.error_handler = error_handler or ErrorHandler(verbose=verbose)
         self.enrich = enrich
         self.verbose = verbose
+        self.scan_mode = scan_mode
+        self.show_ip = show_ip
         self.modules = {}
         self.dns_utils = DNSUtils(max_workers=concurrency)
         self.http_utils = HTTPUtils()
@@ -182,8 +186,12 @@ class DiscoveryManager:
                     )
         
         # Enrich results if requested
-        if self.enrich and result.subdomains:
-            self._enrich_results(result)
+        if (self.enrich or self.show_ip) and result.subdomains:
+            # If in fast mode with show_ip, only resolve IPs without other enrichments
+            if not self.enrich and self.show_ip:
+                self._resolve_ips_only(result)
+            else:
+                self._enrich_results(result)
         
         # Update statistics
         result.stats['total_subdomains'] = len(result.subdomains)
@@ -290,6 +298,42 @@ class DiscoveryManager:
             self.logger.error(f"Discovery method {name} failed: {e}")
             raise DiscoveryError(f"Discovery method {name} failed") from e
             
+    def _resolve_ips_only(self, result: Result) -> None:
+        """Resolve IP addresses for subdomains without performing other enrichments.
+        
+        This is used in fast mode when show_ip is True.
+        
+        Args:
+            result: Result object to enrich
+        """
+        self.logger.info("Resolving IP addresses for subdomains")
+        
+        # Collect all unique IP addresses
+        all_ips = set()
+        
+        # Resolve IP addresses for each subdomain
+        with progress_bar(total=len(result.subdomains), 
+                         desc="Resolving IP addresses", 
+                         disable=not self.verbose) as progress:
+            
+            for subdomain_name, subdomain in result.subdomains.items():
+                try:
+                    # Resolve IP addresses
+                    ip_addresses = self.dns_utils.resolve_domain(subdomain_name)
+                    subdomain.ip_addresses = ip_addresses
+                    
+                    # Add to all IPs set
+                    if ip_addresses:
+                        all_ips.update(ip_addresses)
+                    
+                except Exception as e:
+                    self.logger.debug(f"Error resolving {subdomain_name}: {e}")
+                
+                progress.update(1)
+        
+        # Update statistics
+        result.stats['unique_ips'] = len(all_ips)
+    
     def _enrich_results(self, result: Result) -> None:
         """Enrich subdomain results with additional information.
         

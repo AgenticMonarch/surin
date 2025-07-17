@@ -13,6 +13,16 @@ from surin.core.interfaces import Result, OutputFormatter
 class TextFormatter(OutputFormatter):
     """Format results as plain text."""
 
+    def __init__(self, scan_mode: str = 'fast', show_ip: bool = False):
+        """Initialize the text formatter.
+        
+        Args:
+            scan_mode: Scan mode ('fast' or 'deep')
+            show_ip: Whether to show IP addresses in fast scan mode
+        """
+        self.scan_mode = scan_mode
+        self.show_ip = show_ip
+
     def format(self, result: Result) -> str:
         """Format the result as plain text.
         
@@ -53,6 +63,21 @@ class TextFormatter(OutputFormatter):
             for subdomain in method_subdomains:
                 output.write(f"{subdomain.name}\n")
                 
+                # In fast scan mode, only show subdomain names and optionally IP addresses
+                if self.scan_mode == 'fast':
+                    # Show IP addresses if requested
+                    if self.show_ip and subdomain.ip_addresses:
+                        ips_str = ", ".join(subdomain.ip_addresses)
+                        output.write(f"  IP: {ips_str}\n")
+                    
+                    # Always show discovery methods
+                    methods_str = ", ".join(subdomain.discovery_methods)
+                    output.write(f"  Discovered by: {methods_str}\n")
+                    
+                    output.write("\n")
+                    continue
+                
+                # Deep scan mode - show all details
                 # IP addresses
                 if subdomain.ip_addresses:
                     ips_str = ", ".join(subdomain.ip_addresses)
@@ -216,11 +241,13 @@ class FormatterFactory:
     """Factory for creating output formatters."""
     
     @staticmethod
-    def create_formatter(format_type: str) -> OutputFormatter:
+    def create_formatter(format_type: str, scan_mode: str = 'fast', show_ip: bool = False) -> OutputFormatter:
         """Create an output formatter based on the format type.
         
         Args:
             format_type: Type of formatter (text, json, csv)
+            scan_mode: Scan mode ('fast' or 'deep')
+            show_ip: Whether to show IP addresses in fast scan mode
             
         Returns:
             OutputFormatter instance
@@ -229,7 +256,7 @@ class FormatterFactory:
             ValueError: If format type is invalid
         """
         if format_type == 'text':
-            return TextFormatter()
+            return TextFormatter(scan_mode=scan_mode, show_ip=show_ip)
         elif format_type == 'json':
             return JSONFormatter()
         elif format_type == 'csv':
@@ -238,15 +265,18 @@ class FormatterFactory:
             raise ValueError(f"Invalid format type: {format_type}")
 
 
-def write_output(result: Result, format_type: str, output_file: Optional[str] = None) -> None:
+def write_output(result: Result, format_type: str, output_file: Optional[str] = None, 
+               scan_mode: str = 'fast', show_ip: bool = False) -> None:
     """Write formatted output to file or stdout.
     
     Args:
         result: Discovery result
         format_type: Output format (text, json, csv)
         output_file: Optional output file path
+        scan_mode: Scan mode ('fast' or 'deep')
+        show_ip: Whether to show IP addresses in fast scan mode
     """
-    formatter = FormatterFactory.create_formatter(format_type)
+    formatter = FormatterFactory.create_formatter(format_type, scan_mode=scan_mode, show_ip=show_ip)
     formatted_output = formatter.format(result)
     
     if output_file:
