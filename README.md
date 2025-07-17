@@ -103,7 +103,7 @@ If you encounter any issues during installation:
 surin example.com
 ```
 
-This will run all available discovery methods against the domain `example.com` and display the results in text format.
+This will run all available discovery methods against the domain `example.com` in fast scan mode and display the results in text format. Fast scan mode is the default and only shows subdomain names without additional checks.
 
 ### Selecting Specific Methods
 
@@ -158,6 +158,8 @@ surin example.com -q
 |--------|-------------|
 | `domain` | Target domain to discover subdomains for |
 | `--methods` | Comma-separated list of discovery methods to use (default: all) |
+| `--scan-mode` | Scan mode: fast or deep (default: fast) |
+| `--show-ip` | Show IP addresses in fast scan mode (default: False) |
 | `--output` | Output format: text, json, or csv (default: text) |
 | `--output-file` | Write output to file instead of stdout |
 | `--concurrency` | Maximum number of concurrent operations (default: 10) |
@@ -228,13 +230,55 @@ The JSON output provides a structured representation of all discovered subdomain
 
 The CSV output includes one row per subdomain with columns for all relevant information, suitable for importing into spreadsheets or databases.
 
+## Scan Modes
+
+SURIN supports two scanning modes:
+
+### Fast Scan Mode (Default)
+
+Fast scan mode only discovers subdomain names without performing additional checks like IP resolution, HTTP status checks, or port scanning. This mode is significantly faster and is ideal for initial reconnaissance.
+
+```bash
+# Fast scan is the default
+surin example.com
+
+# Explicitly specify fast scan mode
+surin example.com --scan-mode fast
+```
+
+You can optionally show IP addresses in fast scan mode without performing other checks:
+
+```bash
+# Show IP addresses in fast scan mode
+surin example.com --show-ip
+```
+
+### Deep Scan Mode
+
+Deep scan mode performs comprehensive checks on discovered subdomains, including:
+- IP resolution
+- Public/private IP detection
+- HTTP/HTTPS status checking
+- Open port detection
+- Service identification
+
+```bash
+# Run deep scan
+surin example.com --scan-mode deep
+```
+
+Deep scan provides more information but takes significantly longer to complete.
+
 ## Examples
 
 ### Basic Reconnaissance
 
 ```bash
-# Simple subdomain discovery
+# Simple subdomain discovery (fast scan)
 surin example.com
+
+# Deep scan with all available information
+surin example.com --scan-mode deep
 ```
 
 ### Targeted Reconnaissance with Specific Methods
